@@ -18,7 +18,24 @@ jobs:
             run: |
                 apt-get update
                 apt-get install -y git curl
+
+                # ARM64 packages live on ports.ubuntu.com, not archive.ubuntu.com.
                 dpkg --add-architecture arm64
+
+                # Pin existing DEB822 sources to amd64-only (ubuntu:25.04 format)
+                for f in /etc/apt/sources.list.d/*.sources; do
+                    if [ -f "$f" ] && ! grep -q 'Architectures:' "$f"; then
+                        sed -i '/^Types:/a Architectures: amd64' "$f"
+                    fi
+                done
+
+                # Add arm64 sources from ports.ubuntu.com
+                printf '%s\n' \
+                    'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky main restricted universe multiverse' \
+                    'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky-updates main restricted universe multiverse' \
+                    'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky-security main restricted universe multiverse' \
+                    > /etc/apt/sources.list.d/arm64-ports.list
+
                 apt-get update
                 apt-get install -y crossbuild-essential-arm64 cmake ninja-build pkg-config clang zip
 

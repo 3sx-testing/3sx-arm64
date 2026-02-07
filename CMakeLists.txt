@@ -77,6 +77,7 @@ elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU")
         -Wno-stringop-overflow
         -Wno-restrict
         -Wno-stringop-truncation
+        -Wno-unused-result
     )
 endif()
 
