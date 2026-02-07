@@ -244,7 +244,8 @@ jobs:
           mkdir -p artifacts
           cp /mingw64/bin/libwinpthread-1.dll .
           cp /mingw64/bin/libstdc++-6.dll .
-          zip -j artifacts/3sx-windows.zip build/3sx.exe libwinpthread-1.dll libstdc++-6.dll third_party/ffmpeg/build/bin/*.dll third_party/sdl3/build/bin/*.dll
+          cp /mingw64/bin/libgcc_s_seh-1.dll .
+          zip -j artifacts/3sx-windows.zip build/3sx.exe libwinpthread-1.dll libstdc++-6.dll libgcc_s_seh-1.dll third_party/ffmpeg/build/bin/*.dll third_party/sdl3/build/bin/*.dll
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
