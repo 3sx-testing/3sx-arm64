@@ -1,0 +1,118 @@
+name: Build (Linux ARM64 Cross-Compile)
+
+on:
+    push:
+        branches: [ "main" ]
+    pull_request:
+        branches: [ "main" ]
+
+jobs:
+    build:
+        name: Build (Linux ARM64 via cross-compile)
+        runs-on: ubuntu-latest
+        container:
+            image: ubuntu:25.04
+
+        steps:
+          - name: Install Git and cross-compile toolchain
+            run: |
+                apt-get update
+                apt-get install -y git curl
+                dpkg --add-architecture arm64
+                apt-get update
+                apt-get install -y crossbuild-essential-arm64 cmake ninja-build pkg-config clang zip
+
+          - name: Checkout repository
+            uses: actions/checkout@v4
+            with:
+                submodules: true
+
+          - name: Cache dependencies
+            uses: actions/cache@v4
+            with:
+                path: third_party
+                key: Linux-arm64-cross-deps-${{ hashFiles('build-deps.sh') }}
+
+          - name: Install ARM64 build dependencies
+            run: |
+                apt-get install -y \
+                  libasound2-dev:arm64 libpulse-dev:arm64 \
+                  libx11-dev:arm64 libxext-dev:arm64 libxrandr-dev:arm64 \
+                  libxcursor-dev:arm64 libxfixes-dev:arm64 libxi-dev:arm64 \
+                  libxss-dev:arm64 libxkbcommon-dev:arm64 libdrm-dev:arm64 \
+                  libgbm-dev:arm64 libgl1-mesa-dev:arm64 libgles2-mesa-dev:arm64 \
+                  libegl1-mesa-dev:arm64 libdbus-1-dev:arm64 libudev-dev:arm64 \
+                  libpipewire-0.3-dev:arm64 libwayland-dev:arm64 \
+                  libdecor-0-dev:arm64
+
+          - name: Build FFmpeg (aarch64 cross-compile)
+            run: |
+                cd third_party
+                mkdir -p ffmpeg && cd ffmpeg
+                if [ ! -d "build" ]; then
+                    FFMPEG="ffmpeg-8.0"
+                    if [ ! -d "$FFMPEG" ]; then
+                        curl -L -O "https://ffmpeg.org/releases/$FFMPEG.tar.xz"
+                        tar xf "$FFMPEG.tar.xz"
+                    fi
+                    cd "$FFMPEG"
+                    mkdir -p build && cd build
+                    ../configure \
+                        --prefix="$(pwd)/../../build" \
+                        --arch=aarch64 \
+                        --target-os=linux \
+                        --enable-cross-compile \
+                        --cross-prefix=aarch64-linux-gnu- \
+                        --disable-x86asm \
+                        --disable-all --disable-autodetect \
+                        --disable-static --enable-shared \
+                        --enable-avcodec --enable-avformat --enable-avutil --enable-swresample \
+                        --enable-decoder=adpcm_adx --enable-parser=adx --enable-muxer=adx \
+                        --enable-pic --extra-cflags="-fPIC" \
+                        --extra-ldflags="-Wl,-rpath,\$ORIGIN/../lib"
+                    make -j$(nproc)
+                    make install
+                fi
+
+          - name: Build SDL3 (aarch64 cross-compile)
+            run: |
+                cd third_party
+                mkdir -p sdl3 && cd sdl3
+                if [ ! -d "build" ]; then
+                    SDL="SDL3-3.2.24"
+                    if [ ! -d "$SDL" ]; then
+                        curl -L -O "https://libsdl.org/release/$SDL.tar.gz"
+                        tar xf "$SDL.tar.gz"
+                    fi
+                    cd "$SDL"
+                    mkdir -p build && cd build
+                    cmake .. \
+                        -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/cmake/aarch64-linux-gnu.cmake \
+                        -DCMAKE_INSTALL_PREFIX="$(pwd)/../../build" \
+                        -DBUILD_SHARED_LIBS=ON \
+                        -DSDL_STATIC=OFF
+                    cmake --build . -j$(nproc)
+                    cmake --install .
+                fi
+
+          - name: Build for Linux ARM64
+            run: |
+                set -o pipefail
+                cmake -B build-linux-arm64 \
+                    -DCMAKE_BUILD_TYPE=Release \
+                    -DCMAKE_TOOLCHAIN_FILE=cmake/aarch64-linux-gnu.cmake \
+                    -G Ninja
+                cmake --build build-linux-arm64 --parallel 2>&1 | tee build.log
+            shell: bash
+
+          - name: Verify binary architecture
+            run: |
+                file build-linux-arm64/3sx
+                file build-linux-arm64/3sx | grep -q "aarch64" && echo "✅ ARM64 binary confirmed" || (echo "❌ Not an ARM64 binary!" && exit 1)
+
+          - name: Upload build log
+            if: always()
+            uses: actions/upload-artifact@v4
+            with:
+                name: build-log-arm64-cross
+                path: build.log

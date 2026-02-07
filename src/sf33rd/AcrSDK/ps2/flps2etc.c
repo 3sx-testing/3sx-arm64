@@ -64,7 +64,7 @@ s32 flFileRead(s8* filename, void* buf, s32 len) {
         return 0;
     }
 
-    read(fd, buf, len);
+    (void)read(fd, buf, len);
     close(fd);
     return 1;
 }
@@ -80,11 +80,11 @@ s32 flFileWrite(s8* filename, void* buf, s32 len) {
     strupr(p);
     strcat(temp, ";1");
 
-    if ((fd = open(temp, O_WRONLY | O_CREAT | O_TRUNC)) < 0) {
+    if ((fd = open(temp, O_WRONLY | O_CREAT | O_TRUNC, 0644)) < 0) {
         return 0;
     }
 
-    write(fd, buf, len);
+    (void)write(fd, buf, len);
     close(fd);
     return 1;
 }
@@ -105,7 +105,7 @@ s32 flFileAppend(s8* filename, void* buf, ssize_t len) {
     }
 
     lseek(fd, 0, 2);
-    write(fd, buf, (s32)len);
+    (void)write(fd, buf, (s32)len);
     close(fd);
     return 1;
 }

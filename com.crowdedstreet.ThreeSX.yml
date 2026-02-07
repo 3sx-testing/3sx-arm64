@@ -60,10 +60,6 @@ modules:
 
   - name: 3sx
     buildsystem: cmake-ninja
-    build-options:
-      env:
-        CC: clang
-        CXX: clang++
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
       - -DFFMPEG_ROOT=/app
