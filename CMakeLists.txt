@@ -114,8 +114,12 @@ endif()
 # ======================================
 
 set(THIRD_PARTY_DIR "${CMAKE_SOURCE_DIR}/third_party")
-set(FFMPEG_ROOT "${THIRD_PARTY_DIR}/ffmpeg/build")
-set(SDL3_ROOT "${THIRD_PARTY_DIR}/sdl3/build")
+if(NOT FFMPEG_ROOT)
+    set(FFMPEG_ROOT "${THIRD_PARTY_DIR}/ffmpeg/build")
+endif()
+if(NOT SDL3_ROOT)
+    set(SDL3_ROOT "${THIRD_PARTY_DIR}/sdl3/build")
+endif()
 
 include_directories(
     ${FFMPEG_ROOT}/include
