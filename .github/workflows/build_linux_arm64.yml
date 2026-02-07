@@ -104,7 +104,7 @@ jobs:
                     cd "$SDL"
                     mkdir -p build && cd build
                     cmake .. \
-                        -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/cmake/aarch64-linux-gnu.cmake \
+                        -DCMAKE_TOOLCHAIN_FILE=${GITHUB_WORKSPACE}/cmake/aarch64-linux-gnu.cmake \
                         -DCMAKE_INSTALL_PREFIX="$(pwd)/../../build" \
                         -DBUILD_SHARED_LIBS=ON \
                         -DSDL_STATIC=OFF
