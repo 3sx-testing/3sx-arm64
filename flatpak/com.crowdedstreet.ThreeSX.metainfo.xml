@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.crowdedstreet.3sx</id>
+  <id>com.crowdedstreet.ThreeSX</id>
 
   <name>3SX</name>
   <summary>Street Fighter III: 3rd Strike</summary>
@@ -19,7 +19,7 @@
     </p>
   </description>
 
-  <launchable type="desktop-id">com.crowdedstreet.3sx.desktop</launchable>
+  <launchable type="desktop-id">com.crowdedstreet.ThreeSX.desktop</launchable>
 
   <url type="homepage">https://github.com/crowded-street/3sx</url>
   <url type="bugtracker">https://github.com/crowded-street/3sx/issues</url>

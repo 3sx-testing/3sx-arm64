@@ -212,12 +212,12 @@ endif()
 # ======================================
 
 if(UNIX AND NOT APPLE)
-    install(FILES flatpak/com.crowdedstreet.3sx.desktop
+    install(FILES flatpak/com.crowdedstreet.ThreeSX.desktop
         DESTINATION share/applications)
-    install(FILES flatpak/com.crowdedstreet.3sx.metainfo.xml
+    install(FILES flatpak/com.crowdedstreet.ThreeSX.metainfo.xml
         DESTINATION share/metainfo)
     # Uncomment when an icon is available:
-    # install(FILES flatpak/com.crowdedstreet.3sx.png
+    # install(FILES flatpak/com.crowdedstreet.ThreeSX.png
     #     DESTINATION share/icons/hicolor/128x128/apps)
 endif()
 

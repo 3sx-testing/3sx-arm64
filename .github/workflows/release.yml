@@ -45,8 +45,13 @@ jobs:
 
       - name: Package artifact
         run: |
-          mkdir -p artifacts
-          zip -j artifacts/3sx-linux-x86_64.zip build/3sx third_party/ffmpeg/build/lib/*.so* third_party/sdl3/build/lib/*.so*
+          mkdir -p artifacts pkg/bin pkg/lib
+          cp build/3sx pkg/bin/
+          cp third_party/ffmpeg/build/lib/*.so* pkg/lib/
+          cp third_party/sdl3/build/lib/*.so* pkg/lib/
+          cp dist/3sx.sh pkg/
+          chmod +x pkg/3sx.sh pkg/bin/3sx
+          cd pkg && zip -r ../artifacts/3sx-linux-x86_64.zip . && cd ..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -80,10 +85,13 @@ jobs:
               ./build-deps.sh &&
               CC=clang CXX=clang++ cmake -B build -DCMAKE_BUILD_TYPE=Release &&
               cmake --build build --parallel &&
-              mkdir -p artifacts &&
-              zip -j artifacts/3sx-linux-arm64.zip build/3sx \
-                third_party/ffmpeg/build/lib/*.so* \
-                third_party/sdl3/build/lib/*.so*
+              mkdir -p artifacts pkg/bin pkg/lib &&
+              cp build/3sx pkg/bin/ &&
+              cp third_party/ffmpeg/build/lib/*.so* pkg/lib/ &&
+              cp third_party/sdl3/build/lib/*.so* pkg/lib/ &&
+              cp dist/3sx.sh pkg/ &&
+              chmod +x pkg/3sx.sh pkg/bin/3sx &&
+              cd pkg && zip -r ../artifacts/3sx-linux-arm64.zip . && cd ..
             "
 
       - name: Upload artifact
@@ -210,7 +218,7 @@ jobs:
       - name: Build Flatpak bundle
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          manifest-path: com.crowdedstreet.3sx.yml
+          manifest-path: com.crowdedstreet.ThreeSX.yml
           bundle: 3sx.flatpak
 
       - name: Upload artifact

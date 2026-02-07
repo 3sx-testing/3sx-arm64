@@ -2,6 +2,6 @@
 Name=3SX
 Comment=Street Fighter III: 3rd Strike
 Exec=3sx
-Icon=com.crowdedstreet.3sx
+Icon=com.crowdedstreet.ThreeSX
 Type=Application
 Categories=Game;ArcadeGame;

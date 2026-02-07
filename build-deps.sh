@@ -69,7 +69,8 @@ else
                     --enable-pic --extra-cflags="-fPIC -arch x86_64" \
                     --extra-ldflags="-arch x86_64 -Wl,-rpath,@loader_path/../Frameworks" \
                     --install-name-dir="@rpath" \
-                    --arch=x86_64 --enable-cross-compile --target-os=darwin
+                    --arch=x86_64 --enable-cross-compile --target-os=darwin \
+                    --disable-x86asm
                 make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
                 make install
 

@@ -1,4 +1,4 @@
-app-id: com.crowdedstreet.3sx
+app-id: com.crowdedstreet.ThreeSX
 runtime: org.freedesktop.Platform
 runtime-version: '24.08'
 sdk: org.freedesktop.Sdk
@@ -61,5 +61,5 @@ modules:
       - type: dir
         path: .
     post-install:
-      - install -Dm644 flatpak/com.crowdedstreet.3sx.desktop /app/share/applications/com.crowdedstreet.3sx.desktop
-      - install -Dm644 flatpak/com.crowdedstreet.3sx.metainfo.xml /app/share/metainfo/com.crowdedstreet.3sx.metainfo.xml
+      - install -Dm644 flatpak/com.crowdedstreet.ThreeSX.desktop /app/share/applications/com.crowdedstreet.ThreeSX.desktop
+      - install -Dm644 flatpak/com.crowdedstreet.ThreeSX.metainfo.xml /app/share/metainfo/com.crowdedstreet.ThreeSX.metainfo.xml
