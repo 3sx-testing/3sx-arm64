@@ -17,7 +17,7 @@ jobs:
           - name: Install Git and cross-compile toolchain
             run: |
                 apt-get update
-                apt-get install -y git curl
+                apt-get install -y git curl xz-utils
 
                 # ARM64 packages live on ports.ubuntu.com, not archive.ubuntu.com.
                 dpkg --add-architecture arm64
