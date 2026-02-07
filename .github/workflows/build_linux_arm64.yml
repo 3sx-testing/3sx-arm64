@@ -37,7 +37,7 @@ jobs:
                     > /etc/apt/sources.list.d/arm64-ports.list
 
                 apt-get update
-                apt-get install -y crossbuild-essential-arm64 cmake ninja-build pkg-config clang zip
+                apt-get install -y crossbuild-essential-arm64 cmake ninja-build make pkg-config clang zip file
 
           - name: Checkout repository
             uses: actions/checkout@v4
