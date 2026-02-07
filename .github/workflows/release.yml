@@ -84,7 +84,7 @@ jobs:
               chmod +x build-deps.sh &&
               ./build-deps.sh &&
               CC=clang CXX=clang++ cmake -B build -DCMAKE_BUILD_TYPE=Release &&
-              cmake --build build --parallel &&
+              cmake --build build --parallel 2 &&
               mkdir -p artifacts pkg/bin pkg/lib &&
               cp build/3sx pkg/bin/ &&
               cp third_party/ffmpeg/build/lib/*.so* pkg/lib/ &&
