@@ -208,6 +208,20 @@ elseif(UNIX)
 endif()
 
 # ======================================
+# Desktop integration (Linux)
+# ======================================
+
+if(UNIX AND NOT APPLE)
+    install(FILES flatpak/com.crowdedstreet.3sx.desktop
+        DESTINATION share/applications)
+    install(FILES flatpak/com.crowdedstreet.3sx.metainfo.xml
+        DESTINATION share/metainfo)
+    # Uncomment when an icon is available:
+    # install(FILES flatpak/com.crowdedstreet.3sx.png
+    #     DESTINATION share/icons/hicolor/128x128/apps)
+endif()
+
+# ======================================
 # Packaging
 # ======================================
 

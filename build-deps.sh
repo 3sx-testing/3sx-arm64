@@ -33,45 +33,99 @@ else
         tar xf "$FFMPEG.tar.xz"
     fi
 
-    cd "$FFMPEG"
-
-    mkdir -p build
-    cd build
+    # Common FFmpeg configure flags
+    FFMPEG_COMMON_OPTS="--disable-all --disable-autodetect \
+        --disable-static --enable-shared \
+        --enable-avcodec --enable-avformat --enable-avutil --enable-swresample \
+        --enable-decoder=adpcm_adx --enable-parser=adx --enable-muxer=adx"
 
     case "$OS" in
         Darwin)
-            ../configure \
-                --prefix=$FFMPEG_BUILD \
-                --disable-all --disable-autodetect \
-                --disable-static --enable-shared \
-                --enable-avcodec --enable-avformat --enable-avutil --enable-swresample \
-                --enable-decoder=adpcm_adx --enable-parser=adx --enable-muxer=adx \
-                --enable-pic \
-                --extra-cflags="-fPIC" \
-                --extra-ldflags="-Wl,-rpath,@loader_path/../Frameworks" \
-                --install-name-dir="@rpath"
+            if [ "$TARGET_ARCH" = "universal" ]; then
+                echo "Building FFmpeg universal binary (arm64 + x86_64)..."
+
+                # Build arm64
+                cd "$FFMPEG_DIR/$FFMPEG"
+                mkdir -p build-arm64 && cd build-arm64
+                ../configure \
+                    --prefix="$FFMPEG_DIR/build-arm64-out" \
+                    $FFMPEG_COMMON_OPTS \
+                    --enable-pic --extra-cflags="-fPIC -arch arm64" \
+                    --extra-ldflags="-arch arm64 -Wl,-rpath,@loader_path/../Frameworks" \
+                    --install-name-dir="@rpath" \
+                    --arch=arm64
+                make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+                make install
+
+                # Build x86_64
+                cd "$FFMPEG_DIR/$FFMPEG"
+                mkdir -p build-x86_64 && cd build-x86_64
+                ../configure \
+                    --prefix="$FFMPEG_DIR/build-x86_64-out" \
+                    $FFMPEG_COMMON_OPTS \
+                    --enable-pic --extra-cflags="-fPIC -arch x86_64" \
+                    --extra-ldflags="-arch x86_64 -Wl,-rpath,@loader_path/../Frameworks" \
+                    --install-name-dir="@rpath" \
+                    --arch=x86_64 --enable-cross-compile --target-os=darwin
+                make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+                make install
+
+                # Merge into universal fat binaries via lipo
+                mkdir -p "$FFMPEG_BUILD/lib" "$FFMPEG_BUILD/include"
+                cp -R "$FFMPEG_DIR/build-arm64-out/include/"* "$FFMPEG_BUILD/include/"
+                for dylib in "$FFMPEG_DIR/build-arm64-out/lib/"*.dylib; do
+                    basename=$(basename "$dylib")
+                    x86_dylib="$FFMPEG_DIR/build-x86_64-out/lib/$basename"
+                    if [ -L "$dylib" ]; then
+                        # Preserve symlinks
+                        cp -P "$dylib" "$FFMPEG_BUILD/lib/"
+                    elif [ -f "$x86_dylib" ]; then
+                        lipo -create "$dylib" "$x86_dylib" -output "$FFMPEG_BUILD/lib/$basename"
+                        echo "  lipo: $basename"
+                    else
+                        cp "$dylib" "$FFMPEG_BUILD/lib/"
+                    fi
+                done
+
+                # Clean up per-arch builds
+                rm -rf "$FFMPEG_DIR/build-arm64-out" "$FFMPEG_DIR/build-x86_64-out"
+            else
+                cd "$FFMPEG_DIR/$FFMPEG"
+                mkdir -p build && cd build
+                ../configure \
+                    --prefix=$FFMPEG_BUILD \
+                    $FFMPEG_COMMON_OPTS \
+                    --enable-pic \
+                    --extra-cflags="-fPIC" \
+                    --extra-ldflags="-Wl,-rpath,@loader_path/../Frameworks" \
+                    --install-name-dir="@rpath"
+                make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+                make install
+            fi
             ;;
         Linux)
+            cd "$FFMPEG_DIR/$FFMPEG"
+            mkdir -p build && cd build
             ../configure \
                 --prefix=$FFMPEG_BUILD \
-                --disable-all --disable-autodetect \
-                --disable-static --enable-shared \
-                --enable-avcodec --enable-avformat --enable-avutil --enable-swresample \
-                --enable-decoder=adpcm_adx --enable-parser=adx --enable-muxer=adx \
+                $FFMPEG_COMMON_OPTS \
                 --enable-pic \
                 --extra-cflags="-fPIC" \
                 --extra-ldflags="-Wl,-rpath,\$ORIGIN/../lib" \
                 --install-name-dir=\$ORIGIN
+            make -j$(nproc)
+            make install
             ;;
         MINGW*|MSYS*|CYGWIN*)
+            cd "$FFMPEG_DIR/$FFMPEG"
+            mkdir -p build && cd build
             ../configure \
                 --prefix=$FFMPEG_BUILD \
-                --disable-all --disable-autodetect \
-                --disable-static --enable-shared \
-                --enable-avcodec --enable-avformat --enable-avutil --enable-swresample \
-                --enable-decoder=adpcm_adx --enable-parser=adx --enable-muxer=adx \
+                $FFMPEG_COMMON_OPTS \
                 --extra-cflags="-I/mingw64/include" \
                 --extra-ldflags="-L/mingw64/lib"
+            make -j$(nproc)
+            make install
             ;;
         *)
             echo "Unsupported OS: $OS"
@@ -79,13 +133,11 @@ else
             ;;
     esac
 
-    make -j$(nproc)
-    make install
     echo "FFmpeg installed to $FFMPEG_BUILD"
 
-    cd ../..
+    cd "$FFMPEG_DIR"
     rm -rf "$FFMPEG"
-    rm "$FFMPEG.tar.xz"
+    rm -f "$FFMPEG.tar.xz"
 fi
 
 # -----------------------------
@@ -114,7 +166,14 @@ else
     cd build
 
     case "$OS" in
-        Darwin|Linux)
+        Darwin)
+            SDL_CMAKE_OPTS="-DCMAKE_INSTALL_PREFIX=$SDL_BUILD -DBUILD_SHARED_LIBS=ON -DSDL_STATIC=OFF"
+            if [ "$TARGET_ARCH" = "universal" ]; then
+                SDL_CMAKE_OPTS="$SDL_CMAKE_OPTS -DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+            fi
+            cmake .. $SDL_CMAKE_OPTS
+            ;;
+        Linux)
             cmake .. \
                 -DCMAKE_INSTALL_PREFIX="$SDL_BUILD" \
                 -DBUILD_SHARED_LIBS=ON \

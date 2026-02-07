@@ -2020,6 +2020,18 @@ u8 Setup_Battle_Country() {
         return Random_Stage_Data[0][Rnd32];
     }
 
+    // Q (char 17) has no stage. In netplay, resolve using player indices
+    // directly since New_Challenger/Champion are arcade-only concepts.
+    if (Mode_Type == MODE_NETWORK) {
+        if (My_char[0] == 17) {
+            return My_char[1];
+        }
+
+        if (My_char[1] == 17) {
+            return My_char[0];
+        }
+    }
+
     if (My_char[New_Challenger] == 17) {
         return My_char[Champion];
     }

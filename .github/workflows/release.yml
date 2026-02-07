@@ -7,18 +7,16 @@ on:
 
 jobs:
   build-linux:
-    name: Build (Linux)
+    name: Build (Linux x86_64)
     runs-on: ubuntu-latest
     container:
       image: ubuntu:25.04
     steps:
-      # Step 1: Install Git FIRST
-      - name: Install Git and curl nasm
+      - name: Install Git and tools
         run: |
           apt-get update
           apt-get install -y git curl nasm
 
-      # Step 2: Now checkout can use Git to handle submodules
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -28,15 +26,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: third_party
-          key: ${{ runner.os }}-deps-${{ hashFiles('build-deps.sh') }}
+          key: ${{ runner.os }}-x86_64-deps-${{ hashFiles('build-deps.sh') }}
 
       - name: Install build dependencies
         run: |
-          # Git is already installed, just need the build tools
           apt-get install -y $(cat tools/requirements-ubuntu-sdl3.txt)
           apt-get install -y clang zip
 
-      # ... (the rest of your steps remain the same)
       - name: Build dependencies from source
         run: |
           chmod +x build-deps.sh
@@ -50,17 +46,54 @@ jobs:
       - name: Package artifact
         run: |
           mkdir -p artifacts
-          zip -j artifacts/3sx-linux.zip build/3sx third_party/ffmpeg/build/lib/*.so* third_party/sdl3/build/lib/*.so*
+          zip -j artifacts/3sx-linux-x86_64.zip build/3sx third_party/ffmpeg/build/lib/*.so* third_party/sdl3/build/lib/*.so*
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 3sx-linux
-          path: artifacts/3sx-linux.zip
+          name: 3sx-linux-x86_64
+          path: artifacts/3sx-linux-x86_64.zip
 
+  build-linux-arm64:
+    name: Build (Linux ARM64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build in ARM64 container
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/src -w /src \
+            ubuntu:25.04 bash -c "
+              apt-get update &&
+              apt-get install -y git curl nasm clang zip \
+                \$(cat tools/requirements-ubuntu-sdl3.txt) &&
+              chmod +x build-deps.sh &&
+              ./build-deps.sh &&
+              CC=clang CXX=clang++ cmake -B build -DCMAKE_BUILD_TYPE=Release &&
+              cmake --build build --parallel &&
+              mkdir -p artifacts &&
+              zip -j artifacts/3sx-linux-arm64.zip build/3sx \
+                third_party/ffmpeg/build/lib/*.so* \
+                third_party/sdl3/build/lib/*.so*
+            "
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3sx-linux-arm64
+          path: artifacts/3sx-linux-arm64.zip
 
   build-windows:
-    name: Build (Windows)
+    name: Build (Windows x86_64)
     runs-on: windows-latest
     defaults:
       run:
@@ -118,8 +151,10 @@ jobs:
           path: artifacts/3sx-windows.zip
 
   build-macos:
-    name: Build (macOS)
+    name: Build (macOS Universal)
     runs-on: macos-latest
+    env:
+      TARGET_ARCH: universal
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -130,11 +165,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: third_party
-          key: ${{ runner.os }}-deps-${{ hashFiles('build-deps.sh') }}
+          key: ${{ runner.os }}-universal-deps-${{ hashFiles('build-deps.sh') }}
 
       - name: Install packaging tool
         run: brew install zip
-        
+
       - name: Build dependencies from source
         run: |
           chmod +x build-deps.sh
@@ -143,25 +178,51 @@ jobs:
       - name: Configure and build with CMake
         run: |
           set -o pipefail
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
           cmake --build build --parallel
 
       - name: Package artifact
         run: |
           mkdir -p artifacts
           cd build
-          zip -r ../artifacts/3sx-macos.zip 3sx.app
+          zip -r ../artifacts/3sx-macos-universal.zip 3sx.app
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 3sx-macos
-          path: artifacts/3sx-macos.zip
+          name: 3sx-macos-universal
+          path: artifacts/3sx-macos-universal.zip
+
+  build-flatpak:
+    name: Build Flatpak
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:freedesktop-24.08
+      options: --privileged
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build Flatpak bundle
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: com.crowdedstreet.3sx.yml
+          bundle: 3sx.flatpak
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3sx-flatpak
+          path: 3sx.flatpak
 
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-linux, build-windows, build-macos]
+    needs: [build-linux, build-linux-arm64, build-windows, build-macos, build-flatpak]
     permissions:
       contents: write
     steps:
@@ -176,10 +237,21 @@ jobs:
         with:
           name: "Release ${{ github.ref_name }}"
           tag_name: ${{ github.ref_name }}
-          files: artifacts/*.zip
+          files: |
+            artifacts/*.zip
+            artifacts/*.flatpak
           body: |
             Automated release for ${{ github.ref_name }}
-            
+
             **Commit:** `${{ github.sha }}`
+
+            ### Downloads
+            | Platform | Architecture | File |
+            |----------|-------------|------|
+            | Linux | x86_64 | `3sx-linux-x86_64.zip` |
+            | Linux | ARM64 | `3sx-linux-arm64.zip` |
+            | Windows | x86_64 | `3sx-windows.zip` |
+            | macOS | Universal (arm64 + x86_64) | `3sx-macos-universal.zip` |
+            | Linux (Flatpak) | x86_64 | `3sx.flatpak` |
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           token: ${{ secrets.GITHUB_TOKEN }}
