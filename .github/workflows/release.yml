@@ -232,16 +232,23 @@ jobs:
           merge-multiple: true
           path: artifacts/
 
+      - name: Generate release tag
+        id: tag
+        run: |
+          TAG="build-$(date -u +'%Y%m%d-%H%M%S')"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Generated tag: $TAG"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "Release ${{ github.ref_name }}"
-          tag_name: ${{ github.ref_name }}
+          name: "Release ${{ steps.tag.outputs.tag }}"
+          tag_name: ${{ steps.tag.outputs.tag }}
           files: |
             artifacts/*.zip
             artifacts/*.flatpak
           body: |
-            Automated release for ${{ github.ref_name }}
+            Automated release from `main`
 
             **Commit:** `${{ github.sha }}`
 
@@ -253,5 +260,6 @@ jobs:
             | Windows | x86_64 | `3sx-windows.zip` |
             | macOS | Universal (arm64 + x86_64) | `3sx-macos-universal.zip` |
             | Linux (Flatpak) | x86_64 | `3sx.flatpak` |
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
+
