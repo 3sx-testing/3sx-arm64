@@ -132,12 +132,22 @@ int SDLApp_Init() {
         window_height = window_min_height;
     }
 
+    /* Prefer OpenGL ES 2.0 (better odds on ARM devices); fall back to software if GPU init fails. */
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
     if (!SDL_CreateWindowAndRenderer(app_name, window_width, window_height, window_flags, &window, &renderer)) {
-        SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
-        return 1;
+        SDL_Log("GPU renderer failed (%s), trying software...", SDL_GetError());
+        SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+        if (!SDL_CreateWindowAndRenderer(app_name, window_width, window_height, window_flags, &window, &renderer)) {
+            SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
+            return 1;
+        }
     }
 
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
     // Initialize message renderer
     SDLMessageRenderer_Initialize(renderer);
