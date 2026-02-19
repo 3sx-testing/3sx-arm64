@@ -1,0 +1,62 @@
+name: Build (Windows)
+
+on:
+    push:
+        branches: [ "main" ]
+    pull_request:
+        branches: [ "main" ]
+
+jobs:
+    build:
+        runs-on: windows-latest
+        strategy:
+            matrix:
+                build_type: [Release, Debug]
+
+        defaults:
+            run:
+                shell: msys2 {0}
+
+        steps:
+          - uses: msys2/setup-msys2@v2
+            with:
+                update: true
+                msystem: MINGW64
+                install: >-
+                    make
+                    mingw-w64-x86_64-cmake
+                    mingw-w64-x86_64-ninja
+                    mingw-w64-x86_64-nasm
+                    mingw-w64-x86_64-clang
+                    mingw-w64-x86_64-headers-git
+
+          - name: Checkout repository
+            uses: actions/checkout@v4
+            with:
+                submodules: true
+
+          - name: Cache dependencies
+            uses: actions/cache@v4
+            with:
+                path: third_party
+                key: ${{ runner.os }}-deps-${{ hashFiles('build-deps.sh') }}
+
+          - name: Build dependencies
+            run: sh build-deps.sh
+
+          - name: Build for Windows (${{ matrix.build_type }})
+            run: |
+                set -o pipefail
+
+                CC=clang CXX=clang++ cmake -B build-${{ matrix.build_type }} \
+                    -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+                    -DMSYS2_LOCATION=${{ steps.msys2.outputs.msys2-location }}
+
+                cmake --build build-${{ matrix.build_type }} --parallel 2>&1 | tee build.log
+
+          - name: Upload build log
+            if: always()
+            uses: actions/upload-artifact@v4
+            with:
+                name: build-log-windows-${{ matrix.build_type }}
+                path: build.log
