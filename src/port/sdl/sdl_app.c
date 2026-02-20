@@ -1,13 +1,13 @@
 #include "port/sdl/sdl_app.h"
 #include "common.h"
 #include "port/config.h"
-#include "port/sdl/netstats_renderer.h"
 #include "port/sdl/sdl_debug_text.h"
 #include "port/sdl/sdl_game_renderer.h"
 #include "port/sdl/sdl_message_renderer.h"
 #include "port/sdl/sdl_pad.h"
 #include "port/sound/adx.h"
 #include "sf33rd/AcrSDK/ps2/foundaps2.h"
+#include "sf33rd/Source/Game/main.h"
 
 #include <SDL3/SDL.h>
 
@@ -25,7 +25,8 @@ static const char* app_name = "Street Fighter III: 3rd Strike";
 static const float display_target_ratio = 4.0 / 3.0;
 static const int window_min_width = 384;
 static const int window_min_height = (int)(window_min_width / display_target_ratio);
-static const Uint64 target_frame_time_ns = 1000000000.0 / TARGET_FPS;
+static const double target_fps = 59.59949;
+static const Uint64 target_frame_time_ns = 1000000000.0 / target_fps;
 
 SDL_Window* window = NULL;
 static SDL_Renderer* renderer = NULL;
@@ -52,6 +53,8 @@ static SDL_ScaleMode screen_texture_scale_mode() {
     case SCALEMODE_NEAREST:
     case SCALEMODE_SQUARE_PIXELS:
     case SCALEMODE_INTEGER:
+        return SDL_SCALEMODE_NEAREST;
+    default:
         return SDL_SCALEMODE_NEAREST;
     }
 }
@@ -105,7 +108,6 @@ int SDLApp_Init() {
     SDL_SetAppMetadata(app_name, "0.1", NULL);
     SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_PREFER_LIBDECOR, "1");
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
-    SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
         SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
@@ -130,23 +132,31 @@ int SDLApp_Init() {
         window_height = window_min_height;
     }
 
+    /* Prefer OpenGL ES 2.0 (better odds on ARM devices); fall back to software if GPU init fails. */
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
     if (!SDL_CreateWindowAndRenderer(app_name, window_width, window_height, window_flags, &window, &renderer)) {
-        SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
-        return 1;
+        SDL_Log("GPU renderer failed (%s), trying software...", SDL_GetError());
+        SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+        if (!SDL_CreateWindowAndRenderer(app_name, window_width, window_height, window_flags, &window, &renderer)) {
+            SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
+            return 1;
+        }
     }
 
-    // Force vblank sync for smoother motion pacing
-    if (!SDL_SetRenderVSync(renderer, 1)) {
-        SDL_Log("Warning: couldn't enable vsync: %s", SDL_GetError());
-    }
+SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-
-    // Initialize rendering subsystems
+    // Initialize message renderer
     SDLMessageRenderer_Initialize(renderer);
+
+    // Initialize game renderer
     SDLGameRenderer_Init(renderer);
 
 #if defined(DEBUG)
+    // Initialize debug text renderer
     SDLDebugText_Initialize(renderer);
 #endif
 
@@ -308,6 +318,8 @@ static SDL_FRect get_letterbox_rect(int win_w, int win_h) {
 
     case SCALEMODE_SQUARE_PIXELS:
         return fit_integer_rect(win_w, win_h, 1, 1);
+    default:
+        return fit_4_by_3_rect(win_w, win_h);
     }
 }
 
@@ -351,9 +363,6 @@ void SDLApp_EndFrame() {
 
     // Render
 
-    // This should come before SDLGameRenderer_RenderFrame,
-    // because NetstatsRenderer uses the existing SFIII rendering pipeline
-    NetstatsRenderer_Render();
     SDLGameRenderer_RenderFrame();
 
     if (should_save_screenshot) {
@@ -384,12 +393,12 @@ void SDLApp_EndFrame() {
     SDLDebugText_Render();
 
     // Render metrics
-    // int window_width;
-    // SDL_GetRenderOutputSize(renderer, &window_width, NULL);
-    // SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-    // SDL_SetRenderScale(renderer, 2, 2);
-    // SDL_RenderDebugTextFormat(renderer, (window_width / 2) - 88, 2, "FPS: %.3f", fps);
-    // SDL_SetRenderScale(renderer, 1, 1);
+    int window_width;
+    SDL_GetRenderOutputSize(renderer, &window_width, NULL);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+    SDL_SetRenderScale(renderer, 2, 2);
+    SDL_RenderDebugTextFormat(renderer, (window_width / 2) - 88, 2, "FPS: %.3f", fps);
+    SDL_SetRenderScale(renderer, 1, 1);
 #endif
 
     SDL_RenderPresent(renderer);
